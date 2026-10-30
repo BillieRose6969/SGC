@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGC-Vial | Consola de Conciliación Operativa v2.4.1</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono for strict corporate/technical look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link id="dynamic-favicon" rel="icon" type="image/png" href="">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        corp: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+            color: #1e293b;
+            user-select: none;
+        }
+
+        /* Custom subtle scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Anti-Capture Obfuscation Mechanism */
+        .stealth-active .real-message-content {
+            display: none;
+        }
+        .stealth-active .fake-telemetry-content {
+            display: inline-block;
+        }
+        
+        /* Reveal ONLY on direct row hover or when ALT key is pressed */
+        .stealth-active tr.log-row:hover .real-message-content,
+        body.alt-reveal-active .stealth-active .real-message-content {
+            display: inline-block;
+        }
+        .stealth-active tr.log-row:hover .fake-telemetry-content,
+        body.alt-reveal-active .stealth-active .fake-telemetry-content {
+            display: none;
+        }
+
+        /* Low-Contrast Anti-VNC / Anti-Compression Filter */
+        .low-contrast-mode .real-message-content {
+            color: #64748b !important;
+            font-weight: 400 !important;
+            letter-spacing: -0.01em;
+        }
+
+        /* Screen privacy dim overlay when mouse leaves viewport */
+        #viewport-guard {
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col bg-corp-100 text-corp-800 text-xs">
+
+    <!-- ================================================================= -->
+    <!-- CAPA DE PROTECCIÓN 0: GUARDIA DE CURSOR FUERA DE PANTALLA          -->
+    <!-- ================================================================= -->
+    <div id="viewport-guard" class="fixed inset-0 bg-corp-900/40 backdrop-blur-[2px] z-30 opacity-0 flex items-center justify-center">
+        <div class="bg-corp-900 text-corp-200 px-4 py-2 rounded border border-corp-700 font-mono text-[11px] shadow-lg">
+            <i class="fa-solid fa-lock mr-2 text-amber-400"></i>CONSOLA EN ESPERA DE FOCO ACTIVO
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- PANTALLA DE PÁNICO / CAMUFLAJE TOTAL (SIMULADOR DE MÉTRICAS VLR)   -->
+    <!-- Se activa con tecla ESC, botón Pánico o al perder foco de ventana -->
+    <!-- ================================================================= -->
+    <div id="panic-screen" class="hidden fixed inset-0 z-50 bg-corp-50 flex flex-col justify-between overflow-y-auto select-text">
+        <!-- Header Corporativo Falso -->
+        <div>
+            <header class="bg-corp-900 text-white px-6 py-3 flex items-center justify-between border-b border-corp-700">
+                <div class="flex items-center space-x-3">
+                    <div class="w-7 h-7 rounded bg-sky-700 flex items-center justify-center font-mono font-bold text-xs">
+                        SGC
+                    </div>
+                    <div>
+                        <h1 class="text-sm font-semibold tracking-tight">SGC-Vial | Tablero de Control de Calidad y Procesamiento</h1>
+                        <p class="text-[10px] text-corp-400 font-mono">MÓDULO DE ESTADÍSTICAS DIARIAS // AUDITORÍA DE LOTE VLR - SENDA - SEMÁFORO</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4 font-mono text-[11px]">
+                    <span class="bg-corp-800 px-2.5 py-1 rounded border border-corp-700 text-emerald-400">
+                        <i class="fa-solid fa-circle text-[7px] mr-1.5 align-middle"></i>SERVIDOR CENTRAL: ONLINE
+                    </span>
+                    <span id="panic-clock" class="text-corp-300">29/10/2026</span>
+                </div>
+            </header>
+
+            <!-- Barra de Filtros Falsos Interactivos -->
+            <div class="bg-white border-b border-corp-200 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center space-x-3">
+                    <div>
+                        <label class="block text-[10px] font-semibold text-corp-500 uppercase">Lote de Infracción</label>
+                        <select id="dummy-filter-type" onchange="renderDummyMetrics()" class="mt-0.5 bg-corp-50 border border-corp-300 rounded px-2.5 py-1 text-xs font-medium text-corp-800 focus:outline-none">
+                            <option value="ALL">Todos los vectores (VLR / Senda / Semáforo)</option>
+                            <option value="VLR">Exceso de Velocidad (VLR)</option>
+                            <option value="SENDA">Invasión Senda Peatonal</option>
+                            <option value="SEMAFORO">Violación Luz Roja (Semáforo)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-corp-500 uppercase">Turno Operativo</label>
+                        <select onchange="renderDummyMetrics()" class="mt-0.5 bg-corp-50 border border-corp-300 rounded px-2.5 py-1 text-xs font-medium text-corp-800 focus:outline-none">
+                            <option>Turno Actual (En Curso)</option>
+                            <option>Consolidado 24 Hs</option>
+                            <option>Cierre Día Anterior</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-corp-500 uppercase">Buscar Dominio / ID</label>
+                        <input type="text" placeholder="Ej: AE492KL o ID-9941" class="mt-0.5 bg-corp-50 border border-corp-300 rounded px-2.5 py-1 text-xs font-mono text-corp-800 focus:outline-none">
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="renderDummyMetrics()" class="bg-corp-800 hover:bg-corp-700 text-white px-3 py-1.5 rounded text-xs font-medium transition">
+                        <i class="fa-solid fa-rotate mr-1"></i> Actualizar Consulta
+                    </button>
+                    <button onclick="exportDummyCSV()" class="bg-white hover:bg-corp-100 text-corp-700 border border-corp-300 px-3 py-1.5 rounded text-xs font-medium transition">
+                        <i class="fa-solid fa-file-csv mr-1"></i> Exportar Crudo
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tarjetas de KPIs Falsos -->
+            <div class="px-6 py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-4 rounded border border-corp-200 shadow-sm">
+                    <div class="text-[10px] font-mono uppercase text-corp-500">Total Capturas Auditadas</div>
+                    <div id="kpi-total" class="text-2xl font-bold text-corp-900 mt-1 font-mono">1,428</div>
+                    <div class="text-[11px] text-emerald-600 mt-1"><i class="fa-solid fa-arrow-up mr-1"></i>94.2% efectividad de lote</div>
+                </div>
+                <div class="bg-white p-4 rounded border border-corp-200 shadow-sm">
+                    <div class="text-[10px] font-mono uppercase text-corp-500">Aprobadas Validación</div>
+                    <div id="kpi-approved" class="text-2xl font-bold text-corp-900 mt-1 font-mono">1,186</div>
+                    <div class="text-[11px] text-corp-500 mt-1">83.05% del volumen diario</div>
+                </div>
+                <div class="bg-white p-4 rounded border border-corp-200 shadow-sm">
+                    <div class="text-[10px] font-mono uppercase text-corp-500">Anuladas / Descarte</div>
+                    <div id="kpi-rejected" class="text-2xl font-bold text-corp-900 mt-1 font-mono">208</div>
+                    <div class="text-[11px] text-corp-500 mt-1">Foco / Patente Ilegible / Giro</div>
+                </div>
+                <div class="bg-white p-4 rounded border border-corp-200 shadow-sm">
+                    <div class="text-[10px] font-mono uppercase text-corp-500">Desvíos Detectados (Sheet)</div>
+                    <div id="kpi-errors" class="text-2xl font-bold text-amber-600 mt-1 font-mono">34</div>
+                    <div class="text-[11px] text-amber-700 mt-1">2.38% tasa de recatalogación</div>
+                </div>
+            </div>
+
+            <!-- Tabla de Operadores y Motivos (100% Creíble para el trabajo) -->
+            <div class="px-6 pb-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="lg:col-span-2 bg-white rounded border border-corp-200 shadow-sm overflow-hidden">
+                    <div class="bg-corp-100 px-4 py-2.5 border-b border-corp-200 flex justify-between items-center">
+                        <span class="font-semibold text-corp-800 text-xs">Desglose de Auditoría por Operador (Muestreo Activo)</span>
+                        <span class="font-mono text-[10px] text-corp-500">ACTUALIZADO HACE 2 MIN</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-corp-200 text-[10px] font-mono uppercase text-corp-500 bg-corp-50">
+                                    <th class="py-2 px-3">Operador</th>
+                                    <th class="py-2 px-3">Vector</th>
+                                    <th class="py-2 px-3">Procesadas</th>
+                                    <th class="py-2 px-3">Observaciones</th>
+                                    <th class="py-2 px-3">Motivo Principal</th>
+                                    <th class="py-2 px-3">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dummy-operator-rows" class="divide-y divide-corp-200 text-xs font-mono">
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Distribución de Motivos de Error -->
+                <div class="bg-white rounded border border-corp-200 shadow-sm p-4 flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-semibold text-corp-800 text-xs border-b border-corp-200 pb-2">Incidencia por Tipología de Desvío</h3>
+                        <div class="space-y-3 mt-3 text-xs">
+                            <div>
+                                <div class="flex justify-between mb-1"><span>Mal Catalogado (Aprob./Anul.)</span><span class="font-mono font-semibold">38%</span></div>
+                                <div class="w-full bg-corp-100 h-2 rounded overflow-hidden"><div class="bg-sky-700 h-2" style="width:38%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between mb-1"><span>Marca / Modelo Incorrecto</span><span class="font-mono font-semibold">27%</span></div>
+                                <div class="w-full bg-corp-100 h-2 rounded overflow-hidden"><div class="bg-sky-600 h-2" style="width:27%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between mb-1"><span>Horario / Fecha Incorrecta</span><span class="font-mono font-semibold">19%</span></div>
+                                <div class="w-full bg-corp-100 h-2 rounded overflow-hidden"><div class="bg-sky-500 h-2" style="width:19%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between mb-1"><span>Zárate Senda / Giro Apagado</span><span class="font-mono font-semibold">16%</span></div>
+                                <div class="w-full bg-corp-100 h-2 rounded overflow-hidden"><div class="bg-amber-500 h-2" style="width:16%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 bg-corp-50 p-3 rounded border border-corp-200 text-[11px] text-corp-600">
+                        <div class="font-semibold text-corp-700 mb-1"><i class="fa-solid fa-circle-info mr-1"></i>Nota Técnica de Conciliación</div>
+                        Los registros observados se sincronizan con la planilla de control diario para verificación de líderes de turno.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer con Desbloqueo Secreto (Doble clic en versión v2.4.1-SGC) -->
+        <footer class="bg-corp-200 border-t border-corp-300 px-6 py-2 flex items-center justify-between text-[11px] text-corp-600 font-mono">
+            <span>SISTEMA DE GESTIÓN Y AUDITORÍA VIAL // USO INTERNO EXCLUSIVO</span>
+            <span id="secret-unlock-trigger" ondblclick="deactivatePanicMode()" title="Doble clic para consola" class="cursor-pointer hover:text-corp-900 select-none">
+                Build v2.4.1-SGC
+            </span>
+        </footer>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- PANTALLA DE ACCESO CORPORATIVO (LOGIN SOLO POR PIN INDIVIDUAL)    -->
+    <!-- ================================================================= -->
+    <div id="login-screen" class="fixed inset-0 z-40 bg-corp-900 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded border border-corp-300 shadow-xl overflow-hidden">
+            <div class="bg-corp-800 px-6 py-4 border-b border-corp-700 flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-6 h-6 rounded bg-sky-600 text-white flex items-center justify-center font-mono font-bold text-xs">SGC</div>
+                    <div>
+                        <h2 class="text-white font-semibold text-sm">Acceso a Terminal de Conciliación SGC-Vial</h2>
+                        <p class="text-corp-400 text-[10px] font-mono">AUTENTICACIÓN DE NODO DE AUDITORÍA // BUILD v2.4.1-SGC</p>
+                    </div>
+                </div>
+                <span class="text-[10px] font-mono text-emerald-400 bg-corp-900 px-2 py-0.5 rounded border border-corp-700">TLS 1.3</span>
+            </div>
+
+            <form id="login-form" onsubmit="handleLogin(event)" class="p-6 space-y-4">
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-[11px] font-semibold uppercase text-corp-600">PIN de Operador / Auditor</label>
+                        <span class="text-[10px] font-mono text-corp-400">Credencial de 4 dígitos</span>
+                    </div>
+                    <input type="password" id="login-pin" maxlength="8" required autofocus placeholder="••••" class="w-full bg-corp-50 border border-corp-300 rounded px-3 py-2.5 text-sm font-mono tracking-widest text-corp-900 focus:outline-none focus:border-sky-600">
+                    <p class="text-[10px] text-corp-500 mt-1 font-mono">El sistema asignará automáticamente el nodo y las colas habilitadas según su credencial.</p>
+                </div>
+
+                <div class="bg-corp-50 p-3 rounded border border-corp-200 space-y-2">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="login-start-stealth" checked class="rounded border-corp-300 text-sky-700 focus:ring-0">
+                        <span class="text-[11px] text-corp-700 font-medium">Iniciar con <strong>Modo Sigilo Anti-Captura</strong> activo</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="login-auto-panic" class="rounded border-corp-300 text-sky-700 focus:ring-0">
+                        <span class="text-[11px] text-corp-700 font-medium">Auto-Ocultar al cambiar ventana (Blur Guard)</span>
+                    </label>
+                </div>
+
+                <div id="login-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-[11px] font-mono font-medium">
+                    <i class="fa-solid fa-circle-exclamation mr-1"></i>Error de validación de credencial SGC (Código 403)
+                </div>
+
+                <div class="pt-2 flex items-center justify-between">
+                    <button type="button" onclick="activatePanicMode()" class="text-corp-500 hover:text-corp-800 text-[11px] font-mono underline">
+                        Ir a Tablero Público (ESC)
+                    </button>
+                    <button type="submit" class="bg-corp-900 hover:bg-corp-800 text-white font-medium px-5 py-2 rounded text-xs transition shadow-sm">
+                        Validar Credencial <i class="fa-solid fa-arrow-right ml-1.5"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- INTERFAZ PRINCIPAL CAMUFLADA ("CONSOLA DE LOGS SGC-VIAL")          -->
+    <!-- ================================================================= -->
+    <!-- Barra Superior de Control y Capas Anti-Monitoreo -->
+    <header class="bg-corp-900 text-corp-100 px-4 py-2 border-b border-corp-700 flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div class="flex items-center flex-wrap gap-2.5">
+            <div class="flex items-center space-x-2">
+                <span class="px-1.5 py-0.5 bg-sky-700 text-white rounded font-mono font-bold text-[11px]">SGC-VIAL</span>
+                <span class="font-semibold text-xs tracking-tight hidden xl:inline">Sistema de Gestión y Conciliación</span>
+            </div>
+            <span class="text-corp-600">|</span>
+            <!-- Indicador de Tu Sesión Activa -->
+            <div class="flex items-center space-x-1.5 bg-corp-800 px-2.5 py-1 rounded border border-sky-700/70" title="Tu credencial activa en esta terminal">
+                <i class="fa-solid fa-user-shield text-[10px] text-sky-400"></i>
+                <span class="font-mono text-[10px] text-corp-400">SESIÓN:</span>
+                <span class="font-mono text-[11px] font-semibold text-white" id="header-active-user">NODO</span>
+            </div>
+            <!-- Monitor de Nodos En Línea en Tiempo Real (Marcos, Rocío, María) -->
+            <div class="flex items-center space-x-1.5 bg-corp-950/80 px-2.5 py-1 rounded border border-corp-700">
+                <span class="font-mono text-[10px] text-corp-400 uppercase hidden sm:inline">En línea:</span>
+                <div id="header-online-nodes" class="flex items-center space-x-1.5">
+                    <!-- Renderizado en tiempo real: MP01, RC02, MF03 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Controles de Seguridad Anti-Monitoreo en Vivo -->
+        <div class="flex items-center flex-wrap gap-1.5">
+            <!-- Capa 1: Modo Sigilo (Ofusca los mensajes como código VLR salvo al pasar el mouse) -->
+            <button id="btn-stealth-toggle" onclick="toggleStealthMode()" class="px-2.5 py-1 rounded border text-[11px] font-mono flex items-center space-x-1.5 transition bg-emerald-950/80 border-emerald-700 text-emerald-300" title="Oculta el texto real y nombres como si fueran códigos del sistema. Pasá el mouse sobre una fila o mantené presionada la tecla ALT para leer.">
+                <i class="fa-solid fa-eye-slash"></i>
+                <span>Modo Sigilo: <strong id="stealth-status-text">ACTIVO</strong></span>
+            </button>
+
+            <!-- Capa 2: Filtro Bajo Contraste (Dificulta lectura en compresión de video remoto VNC) -->
+            <button id="btn-contrast-toggle" onclick="toggleLowContrast()" class="px-2.5 py-1 rounded border border-corp-700 bg-corp-800 hover:bg-corp-700 text-corp-300 text-[11px] font-mono flex items-center space-x-1 transition" title="Reduce el contraste tipográfico para dificultar capturas remotas comprimidas">
+                <i class="fa-solid fa-sliders"></i>
+                <span class="hidden md:inline">Bajo Contraste</span>
+            </button>
+
+            <!-- Capa 3: Auto-Pánico al cambiar de ventana -->
+            <button id="btn-autoblur-toggle" onclick="toggleAutoBlurPanic()" class="px-2.5 py-1 rounded border border-corp-700 bg-corp-800 hover:bg-corp-700 text-corp-300 text-[11px] font-mono flex items-center space-x-1 transition" title="Si cambiás de programa o pestaña, salta automáticamente la pantalla falsa de estadísticas">
+                <i class="fa-solid fa-window-restore"></i>
+                <span class="hidden lg:inline">Auto-Ocultar al cambiar ventana: <strong id="autoblur-status-text">OFF</strong></span>
+            </button>
+
+            <!-- BOTÓN DE PÁNICO INMEDIATO (Tecla ESC) -->
+            <button onclick="activatePanicMode()" class="px-3 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white font-mono font-semibold text-[11px] flex items-center space-x-1 shadow-sm transition" title="Ocultar chat inmediatamente (Atajo: Tecla ESC)">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span>PÁNICO (ESC)</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Cuerpo Principal: Barra Lateral de Canales + Tabla de Registros (Mensajes) -->
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- Sidebar Izquierdo: Canales de Comunicación (Disfrazados de "Colas de Auditoría") -->
+        <aside class="w-64 bg-corp-200/70 border-r border-corp-300 flex flex-col justify-between shrink-0">
+            <div class="p-3 space-y-4 overflow-y-auto">
+                <!-- Sección Canales -->
+                <div>
+                    <div class="flex items-center justify-between px-2 mb-1.5">
+                        <span class="text-[10px] font-mono font-bold uppercase text-corp-500 tracking-wider">Colas de Auditoría</span>
+                        <span id="connection-badge" class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">SYNC</span>
+                    </div>
+
+                    <div id="channel-list" class="space-y-1">
+                        <!-- Renderizado dinámicamente según el usuario logueado -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones de Fin de Turno (Purgar Lote Diario + Salir) -->
+            <div class="p-3 border-t border-corp-300 bg-corp-200 space-y-2">
+                <button onclick="openPurgeModal()" class="w-full py-1.5 px-3 rounded border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 font-medium text-[11px] flex items-center justify-center space-x-1.5 transition">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>Purgar Lote Diario</span>
+                </button>
+                <button id="btn-lock-terminal" type="button" onclick="window.logoutSession()" class="w-full py-1.5 px-3 rounded border border-corp-300 bg-white hover:bg-corp-100 text-corp-700 font-medium text-[11px] flex items-center justify-center space-x-1.5 transition cursor-pointer">
+                    <i class="fa-solid fa-lock"></i>
+                    <span>Bloquear Terminal</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Panel Central: Vista de Tabla de Auditoría (El Chat Camuflado) -->
+        <main class="flex-1 flex flex-col bg-white overflow-hidden">
+            <!-- Sub-barra del Canal Actual -->
+            <div class="bg-corp-50 border-b border-corp-200 px-4 py-2 flex items-center justify-between shrink-0">
+                <div class="flex items-center space-x-2">
+                    <span class="font-mono text-[11px] font-semibold px-2 py-0.5 rounded bg-corp-200 text-corp-800" id="active-channel-code">COLA-GRAL</span>
+                    <h2 class="font-semibold text-corp-800 text-xs" id="active-channel-title">Cola General (Grupal)</h2>
+                    <span class="text-[11px] text-corp-500 hidden sm:inline" id="active-channel-subtitle">— Nodos habilitados: MP01, RC02, MF03</span>
+                </div>
+                <div class="flex items-center space-x-3 text-[11px] font-mono text-corp-500">
+                    <span id="message-counter">0 registros</span>
+                    <button onclick="scrollToBottom()" class="hover:text-corp-800" title="Ir al último registro">
+                        <i class="fa-solid fa-arrow-down"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contenedor de la Tabla de Mensajes -->
+            <div id="messages-container" class="flex-1 overflow-y-auto stealth-active">
+                <table class="w-full text-left border-collapse table-fixed">
+                    <thead class="bg-corp-100 border-b border-corp-300 sticky top-0 z-10 text-[10px] font-mono uppercase text-corp-600">
+                        <tr>
+                            <th class="py-2 px-3 w-28">Marca Temporal / ID</th>
+                            <th class="py-2 px-3 w-40">Nodo Auditor</th>
+                            <th class="py-2 px-3">Registro / Observación Técnica</th>
+                            <th class="py-2 px-3 w-32 text-center">Conciliado (Visto)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="messages-tbody" class="divide-y divide-corp-200 font-sans text-xs">
+                        <!-- Filas de mensajes generadas en tiempo real -->
+                    </tbody>
+                </table>
+
+                <!-- Estado vacío -->
+                <div id="empty-channel-state" class="hidden py-16 text-center text-corp-400 font-mono text-xs">
+                    <i class="fa-regular fa-folder-open text-xl mb-2 block"></i>
+                    SIN REGISTROS EN ESTA COLA DE AUDITORÍA PARA EL TURNO ACTUAL
+                </div>
+            </div>
+
+            <!-- Barra Inferior de Ingreso de Mensaje (Simula "Carga de Incidencia Técnica") -->
+            <div class="border-t border-corp-300 bg-corp-50 p-3 shrink-0">
+                <!-- Etiquetas Rápidas y Adjuntador de Link de Drive Camuflado -->
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div class="flex items-center flex-wrap gap-1">
+                        <span class="text-[10px] font-mono uppercase text-corp-500 mr-1">Comandos Lote:</span>
+                        <button type="button" onclick="insertQuickTag('[VLR] ')" class="px-2 py-0.5 rounded bg-corp-200 hover:bg-corp-300 text-corp-800 font-mono text-[10px] transition">[VLR]</button>
+                        <button type="button" onclick="insertQuickTag('[SENDA] ')" class="px-2 py-0.5 rounded bg-corp-200 hover:bg-corp-300 text-corp-800 font-mono text-[10px] transition">[SENDA]</button>
+                        <button type="button" onclick="insertQuickTag('[SEMÁFORO] ')" class="px-2 py-0.5 rounded bg-corp-200 hover:bg-corp-300 text-corp-800 font-mono text-[10px] transition">[SEMÁFORO]</button>
+                        <button type="button" onclick="insertQuickTag('[REVISAR SHEET] ')" class="px-2 py-0.5 rounded bg-sky-100 hover:bg-sky-200 text-sky-800 font-mono text-[10px] transition">[REVISAR SHEET]</button>
+                        <button type="button" onclick="insertQuickTag('[URGENTE] ')" class="px-2 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 font-mono text-[10px] transition">[URGENTE]</button>
+                    </div>
+
+                    <!-- Botón para adjuntar link de Drive / Captura de forma disimulada -->
+                    <button type="button" onclick="toggleAttachmentInput()" class="text-[11px] font-mono text-sky-700 hover:text-sky-900 flex items-center space-x-1">
+                        <i class="fa-solid fa-paperclip"></i>
+                        <span>Adjuntar Link Evidencia (Drive)</span>
+                    </button>
+                </div>
+
+                <!-- Campo opcional para pegar URL de Drive y camuflarla -->
+                <div id="attachment-bar" class="hidden mb-2 flex items-center space-x-2 bg-white p-1.5 rounded border border-corp-300">
+                    <span class="text-[10px] font-mono text-corp-500 px-1"><i class="fa-brands fa-google-drive mr-1"></i>URL Captura/Sheet:</span>
+                    <input type="url" id="attachment-url-input" placeholder="Pegá acá el link de Drive o de la imagen..." class="flex-1 text-xs font-mono bg-transparent focus:outline-none text-corp-800">
+                    <button type="button" onclick="clearAttachmentInput()" class="text-corp-400 hover:text-corp-700 px-1.5">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- Formulario de envío -->
+                <form id="message-form" onsubmit="handleSendMessage(event)" class="flex items-center space-x-2">
+                    <div class="relative flex-1">
+                        <input
+                            type="text"
+                            id="message-input"
+                            autocomplete="off"
+                            placeholder="Ingresar observación técnica o comando de lote (Enter para registrar)..."
+                            class="w-full bg-white border border-corp-300 rounded px-3 py-2 text-xs text-corp-900 focus:outline-none focus:border-sky-700 font-sans"
+                        >
+                    </div>
+                    <button type="submit" class="bg-corp-900 hover:bg-corp-800 text-white font-mono text-xs px-4 py-2 rounded transition shrink-0 flex items-center space-x-1.5">
+                        <span>Registrar</span>
+                        <i class="fa-solid fa-paper-plane text-[10px]"></i>
+                    </button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- MODAL: CONFIRMACIÓN DE PURGA DE LOTE DIARIO (BORRADO TOTAL)       -->
+    <!-- ================================================================= -->
+    <div id="purge-modal" class="hidden fixed inset-0 z-50 bg-corp-900/60 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded border border-corp-300 shadow-xl overflow-hidden">
+            <div class="bg-red-900 text-white px-5 py-3 flex items-center justify-between">
+                <span class="font-semibold text-xs"><i class="fa-solid fa-triangle-exclamation mr-1.5"></i>Confirmar Purga de Lote Diario</span>
+                <button onclick="closePurgeModal()" class="text-red-200 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 space-y-4 text-xs">
+                <p class="text-corp-700 leading-relaxed">
+                    Esta acción <strong>eliminará permanentemente todos los registros</strong> tanto de la Cola General como de los Enlaces Directos privados para dejar la base limpia al cierre del turno.
+                </p>
+                <div class="flex justify-end space-x-2">
+                    <button type="button" onclick="closePurgeModal()" class="px-3 py-1.5 rounded border border-corp-300 text-corp-700 hover:bg-corp-100">Cancelar</button>
+                    <button type="button" id="btn-confirm-purge" onclick="executePurgeAllMessages()" class="px-4 py-1.5 rounded bg-red-700 text-white hover:bg-red-800 font-medium">
+                        Sí, Purgar Lote
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- LÓGICA DE APLICACIÓN Y SINCRONIZACIÓN EN TIEMPO REAL (FIRESTORE)   -->
+    <!-- ================================================================= -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- CREDENCIALES OFICIALES DE FIREBASE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDsZCgEgHX1GKUGatm7BlnAXBZORVz5ouk",
+            authDomain: "sgc-vial.firebaseapp.com",
+            projectId: "sgc-vial",
+            storageBucket: "sgc-vial.firebasestorage.app",
+            messagingSenderId: "645701532646",
+            appId: "1:645701532646:web:c5031c3d6582e945807427"
+        };
+
+        // --- DIRECTORIO FIJO DE OPERADORES Y CREDENCIALES ---
+        const OPERATORS = {
+            marcos: {
+                id: 'marcos',
+                pin: '8495',
+                name: 'Marcos',
+                nodeCode: 'AUD-MP01',
+                shortCode: 'MP01',
+                fullAlias: 'AUD-MP01 | Marcos',
+                badgeClass: 'bg-sky-100 text-sky-900 border-sky-300'
+            },
+            rocio: {
+                id: 'rocio',
+                pin: '0412',
+                name: 'Rocío',
+                nodeCode: 'LÍDER-RC02',
+                shortCode: 'RC02',
+                fullAlias: 'LÍDER-RC02 | Rocío',
+                badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-300'
+            },
+            maria: {
+                id: 'maria',
+                pin: '3603',
+                name: 'María',
+                nodeCode: 'LÍDER-MF03',
+                shortCode: 'MF03',
+                fullAlias: 'LÍDER-MF03 | María',
+                badgeClass: 'bg-teal-100 text-teal-900 border-teal-300'
+            }
+        };
+
+        // --- ESTADO GLOBAL DE LA CONSOLA ---
+        const state = {
+            firebaseUser: null,
+            activeProfile: null, // 'marcos' | 'rocio' | 'maria'
+            activeChannel: 'general',
+            stealthMode: true,
+            lowContrastMode: false,
+            autoBlurPanic: false,
+            panicActive: false,
+            windowFocused: true,
+            messages: [],
+            presence: {}, // { marcos: { status: 'online'|'away'|'offline', lastSeen: timestamp }, ... }
+            lastReadTimestamps: {
+                general: 0,
+                priv_marcos_rocio: 0,
+                priv_marcos_maria: 0,
+                priv_rocio_maria: 0
+            }
+        };
+
+        // --- DEFINICIÓN DE CANALES (COLA GENERAL + ENLACES DIRECTOS 1 A 1) ---
+        function getAvailableChannels() {
+            const p = state.activeProfile;
+            const isStealth = state.stealthMode;
+
+            const formatPeerLabel = (name, code) => isStealth ? `(${code})` : `${name} (${code})`;
+
+            const generalChannel = {
+                id: 'general',
+                code: 'COLA-GRAL',
+                name: 'Cola General (Grupal)',
+                subtitle: isStealth
+                    ? 'Nodos habilitados: (MP01), (RC02), (MF03)'
+                    : 'Nodos habilitados: Marcos (MP01), Rocío (RC02), María (MF03)',
+                participants: ['marcos', 'rocio', 'maria'],
+                icon: 'fa-layer-group'
+            };
+
+            if (!p) return [generalChannel];
+
+            if (p === 'marcos') {
+                return [
+                    generalChannel,
+                    {
+                        id: 'priv_marcos_rocio',
+                        code: 'DIR-RC02',
+                        name: `Enlace Directo: ${formatPeerLabel('Rocío', 'RC02')}`,
+                        subtitle: 'Canal exclusivo AUD-MP01 ↔ LÍDER-RC02',
+                        participants: ['marcos', 'rocio'],
+                        icon: 'fa-lock'
+                    },
+                    {
+                        id: 'priv_marcos_maria',
+                        code: 'DIR-MF03',
+                        name: `Enlace Directo: ${formatPeerLabel('María', 'MF03')}`,
+                        subtitle: 'Canal exclusivo AUD-MP01 ↔ LÍDER-MF03',
+                        participants: ['marcos', 'maria'],
+                        icon: 'fa-lock'
+                    }
+                ];
+            }
+
+            if (p === 'rocio') {
+                return [
+                    generalChannel,
+                    {
+                        id: 'priv_marcos_rocio',
+                        code: 'DIR-MP01',
+                        name: `Enlace Directo: ${formatPeerLabel('Marcos', 'MP01')}`,
+                        subtitle: 'Canal exclusivo LÍDER-RC02 ↔ AUD-MP01',
+                        participants: ['marcos', 'rocio'],
+                        icon: 'fa-lock'
+                    },
+                    {
+                        id: 'priv_rocio_maria',
+                        code: 'DIR-MF03',
+                        name: `Enlace Directo: ${formatPeerLabel('María', 'MF03')}`,
+                        subtitle: 'Canal exclusivo LÍDER-RC02 ↔ LÍDER-MF03',
+                        participants: ['rocio', 'maria'],
+                        icon: 'fa-lock'
+                    }
+                ];
+            }
+
+            if (p === 'maria') {
+                return [
+                    generalChannel,
+                    {
+                        id: 'priv_marcos_maria',
+                        code: 'DIR-MP01',
+                        name: `Enlace Directo: ${formatPeerLabel('Marcos', 'MP01')}`,
+                        subtitle: 'Canal exclusivo LÍDER-MF03 ↔ AUD-MP01',
+                        participants: ['marcos', 'maria'],
+                        icon: 'fa-lock'
+                    },
+                    {
+                        id: 'priv_rocio_maria',
+                        code: 'DIR-RC02',
+                        name: `Enlace Directo: ${formatPeerLabel('Rocío', 'RC02')}`,
+                        subtitle: 'Canal exclusivo LÍDER-MF03 ↔ LÍDER-RC02',
+                        participants: ['rocio', 'maria'],
+                        icon: 'fa-lock'
+                    }
+                ];
+            }
+
+            return [generalChannel];
+        }
+
+        function getOperatorInfo(profileId) {
+            return OPERATORS[profileId] || {
+                id: 'unknown',
+                name: 'Auditor',
+                nodeCode: 'AUD-SYS',
+                shortCode: 'SYS',
+                fullAlias: 'AUD-SYS | Sistema',
+                badgeClass: 'bg-corp-100 text-corp-800 border-corp-300'
+            };
+        }
+
+        // --- GENERADOR DE TELEMETRÍA FALSA PARA EL MODO SIGILO ANTI-CAPTURA ---
+        const fakeLogTemplates = [
+            (num, lote) => `SYS_LOG // VLR_CAM04 :: EXP_${num} -> VALIDACIÓN_DOMINIO_OK`,
+            (num, lote) => `SYNC_DB // SENDA_PEATONAL :: LOTE_0${lote} -> SIN_ANOMALÍAS`,
+            (num, lote) => `AUDIT_ daemon // SEM_CRUCE_0${lote} :: ID_${num} -> GIRO_APAGADO_DESCARTADO`,
+            (num, lote) => `CHK_IMG // VLR_RUTA9 :: EXP_${num} -> MARCA_MODELO_VERIFICADO`,
+            (num, lote) => `SYS_LOG // ZARATE_SENDA :: LOTE_0${lote} -> TELEMETRÍA_HORARIO_OK`,
+            (num, lote) => `SYNC_DB // NODO_CENTRAL :: EXP_${num} -> CONCILIACIÓN_SHEET_OK`
+        ];
+
+        function generateFakeTelemetry(msgId, timestamp) {
+            let hash = 0;
+            const str = String(msgId || timestamp);
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
+            }
+            const absHash = Math.abs(hash);
+            const numId = 10000 + (absHash % 89999);
+            const loteNum = 1 + (absHash % 9);
+            const templateFn = fakeLogTemplates[absHash % fakeLogTemplates.length];
+            return templateFn(numId, loteNum);
+        }
+
+        // --- INICIALIZACIÓN DE FIREBASE ---
+        const appId = 'sgc-vial-audit-app';
+        let db = null;
+        let auth = null;
+        let unsubscribeMessages = null;
+        let unsubscribePresence = null;
+        let presenceHeartbeatTimer = null;
+
+        async function initFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Autenticación en el proyecto sgc-vial con respaldo directo para modo de prueba de Firestore
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token && firebaseConfig.projectId !== 'sgc-vial') {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (authErr) {
+                    console.warn("Conexión directa con Firestore:", authErr.message);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        state.firebaseUser = user;
+                        setConnectionBadge('ONLINE', true);
+                        startFirestoreListeners();
+                    }
+                });
+
+                // Si Firestore está en modo de prueba y aún no se activó Auth Anónimo, iniciar sincronización igualmente
+                if (!auth.currentUser) {
+                    state.firebaseUser = { uid: 'node_' + Math.random().toString(36).substring(2, 9) };
+                    setConnectionBadge('ONLINE', true);
+                    startFirestoreListeners();
+                }
+            } catch (err) {
+                console.error("Error inicializando sincronización:", err);
+                setConnectionBadge('LOCAL', false);
+            }
+        }
+
+        function setConnectionBadge(text, isOnline) {
+            const badge = document.getElementById('connection-badge');
+            if (!badge) return;
+            badge.textContent = text;
+            badge.className = isOnline
+                ? 'text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300'
+                : 'text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300';
+        }
+
+        function startFirestoreListeners() {
+            if (!state.firebaseUser || !db) return;
+
+            // 1. Listener para todos los mensajes (RULE 2: Simple collection query, filter & sort in JS memory)
+            const msgsColRef = collection(db, 'artifacts', appId, 'public', 'data', 'sgc_messages');
+            unsubscribeMessages = onSnapshot(msgsColRef, (snapshot) => {
+                const loaded = [];
+                snapshot.forEach(docSnap => {
+                    loaded.push({ id: docSnap.id, ...docSnap.data() });
+                });
+                // Ordenar cronológicamente en memoria
+                loaded.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                state.messages = loaded;
+
+                // Solo marcar como leído automáticamente si el usuario tiene la pestaña activa en primer plano y sin pantalla de pánico
+                const isActivelyViewing = state.activeProfile && state.windowFocused && !document.hidden && !state.panicActive;
+                if (isActivelyViewing) {
+                    state.lastReadTimestamps[state.activeChannel] = Date.now();
+                }
+
+                renderChannelsSidebar();
+                renderMessagesTable();
+                updateTabTitleNotification();
+            }, (err) => {
+                console.error("Error leyendo cola de mensajes:", err);
+            });
+
+            // 2. Listener de Presencia en Línea en Tiempo Real (MP01, RC02, MF03)
+            const presenceColRef = collection(db, 'artifacts', appId, 'public', 'data', 'sgc_presence');
+            unsubscribePresence = onSnapshot(presenceColRef, (snapshot) => {
+                const presMap = {};
+                snapshot.forEach(docSnap => {
+                    presMap[docSnap.id] = docSnap.data();
+                });
+                state.presence = presMap;
+                renderOnlineNodesBar();
+                renderChannelsSidebar();
+            }, (err) => {
+                console.error("Error leyendo presencia:", err);
+            });
+        }
+
+        // --- SISTEMA DE PRESENCIA EN TIEMPO REAL ---
+        async function publishPresence(statusOverride, profileOverride) {
+            const targetProfile = profileOverride || state.activeProfile;
+            if (!targetProfile) return;
+            const currentStatus = statusOverride || ((state.windowFocused && !document.hidden && !state.panicActive) ? 'online' : 'away');
+            const payload = {
+                profileId: targetProfile,
+                status: currentStatus,
+                lastSeen: Date.now()
+            };
+
+            // Actualizar estado local inmediatamente
+            state.presence[targetProfile] = payload;
+            renderOnlineNodesBar();
+
+            if (state.firebaseUser && db) {
+                try {
+                    const presDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'sgc_presence', targetProfile);
+                    await setDoc(presDocRef, payload);
+                } catch (err) {
+                    console.error("Error publicando presencia:", err);
+                }
+            }
+        }
+
+        function startPresenceHeartbeat() {
+            if (presenceHeartbeatTimer) clearInterval(presenceHeartbeatTimer);
+            publishPresence();
+            presenceHeartbeatTimer = setInterval(() => {
+                if (state.activeProfile) {
+                    publishPresence();
+                }
+                // Re-evaluar expiración de presencia de los demás nodos cada 15s
+                renderOnlineNodesBar();
+            }, 15000);
+        }
+
+        function stopPresenceHeartbeat() {
+            if (presenceHeartbeatTimer) {
+                clearInterval(presenceHeartbeatTimer);
+                presenceHeartbeatTimer = null;
+            }
+        }
+
+        function getOperatorOnlineState(profileId) {
+            if (profileId === state.activeProfile) {
+                return (state.windowFocused && !document.hidden && !state.panicActive) ? 'online' : 'away';
+            }
+            const record = state.presence[profileId];
+            if (!record || !record.lastSeen) return 'offline';
+            const elapsed = Date.now() - record.lastSeen;
+            // Si pasaron más de 45 segundos sin latido o cerró sesión, figura desconectado
+            if (elapsed > 45000 || record.status === 'offline') return 'offline';
+            return record.status === 'away' ? 'away' : 'online';
+        }
+
+        function renderOnlineNodesBar() {
+            const container = document.getElementById('header-online-nodes');
+            if (!container) return;
+
+            const allProfiles = ['marcos', 'rocio', 'maria'];
+            container.innerHTML = allProfiles.map(pid => {
+                const op = getOperatorInfo(pid);
+                const status = getOperatorOnlineState(pid);
+
+                let dotClass = 'bg-corp-500';
+                let textClass = 'text-corp-400 border-corp-700 bg-corp-900/50';
+                let statusLabel = 'Desconectado';
+
+                if (status === 'online') {
+                    dotClass = 'bg-emerald-400 shadow-[0_0_6px_#34d399]';
+                    textClass = 'text-emerald-200 border-emerald-700/80 bg-emerald-950/60';
+                    statusLabel = 'En línea (Ventana activa)';
+                } else if (status === 'away') {
+                    dotClass = 'bg-amber-400';
+                    textClass = 'text-amber-200 border-amber-700/70 bg-amber-950/50';
+                    statusLabel = 'Conectado (En otra pestaña)';
+                }
+
+                // Si el Modo Sigilo está activo, el cartel visible dice solo MP01, RC02, MF03; el tooltip muestra el detalle
+                const visibleLabel = state.stealthMode ? op.shortCode : `${op.shortCode} (${op.name})`;
+
+                return `
+                    <div class="flex items-center space-x-1.5 px-2 py-0.5 rounded border font-mono text-[10px] transition ${textClass}" title="${escapeHtml(op.fullAlias)}: ${statusLabel}">
+                        <span class="w-2 h-2 rounded-full ${dotClass}"></span>
+                        <span>${escapeHtml(visibleLabel)}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- ACTUALIZACIÓN DE INTERFAZ ---
+        function updateHeaderActiveUser() {
+            if (!state.activeProfile) return;
+            const op = getOperatorInfo(state.activeProfile);
+            document.getElementById('header-active-user').textContent = state.stealthMode ? op.nodeCode : op.fullAlias;
+            document.getElementById('header-active-user').title = `Sesión activa: ${op.fullAlias}`;
+            renderOnlineNodesBar();
+        }
+
+        function renderChannelsSidebar() {
+            const listEl = document.getElementById('channel-list');
+            if (!listEl) return;
+
+            const channels = getAvailableChannels();
+            listEl.innerHTML = '';
+
+            channels.forEach(ch => {
+                const isActive = ch.id === state.activeChannel;
+                // Contar no leídos en este canal
+                const lastRead = state.lastReadTimestamps[ch.id] || 0;
+                const unreadCount = state.messages.filter(m =>
+                    m.channel === ch.id &&
+                    m.sender !== state.activeProfile &&
+                    (m.createdAt || 0) > lastRead
+                ).length;
+
+                // Para canales privados 1 a 1, mostrar punto de estado del otro participante
+                let peerDotHtml = '';
+                if (ch.id !== 'general' && state.activeProfile) {
+                    const peerId = ch.participants.find(p => p !== state.activeProfile);
+                    const peerState = getOperatorOnlineState(peerId);
+                    const peerColor = peerState === 'online' ? 'bg-emerald-400' : (peerState === 'away' ? 'bg-amber-400' : 'bg-corp-400');
+                    peerDotHtml = `<span class="w-2 h-2 rounded-full ${peerColor} shrink-0" title="Estado del nodo"></span>`;
+                }
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.onclick = () => selectChannel(ch.id);
+                btn.className = isActive
+                    ? 'w-full text-left px-2.5 py-2 rounded bg-corp-800 text-white font-medium flex items-center justify-between transition shadow-sm'
+                    : 'w-full text-left px-2.5 py-2 rounded hover:bg-corp-300/70 text-corp-700 font-medium flex items-center justify-between transition';
+
+                btn.innerHTML = `
+                    <div class="flex items-center space-x-2 truncate pr-2">
+                        <i class="fa-solid ${ch.icon} text-[10px] ${isActive ? 'text-sky-400' : 'text-corp-500'}"></i>
+                        <div class="truncate">
+                            <div class="text-[11px] truncate flex items-center space-x-1.5">
+                                <span>${escapeHtml(ch.name)}</span>
+                                ${peerDotHtml}
+                            </div>
+                            <div class="text-[9px] font-mono ${isActive ? 'text-corp-400' : 'text-corp-500'}">${ch.code}</div>
+                        </div>
+                    </div>
+                    ${unreadCount > 0 ? `<span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded bg-amber-500 text-corp-900" title="${unreadCount} registros sin leer">${unreadCount}</span>` : ''}
+                `;
+                listEl.appendChild(btn);
+            });
+
+            // Actualizar cabecera del canal activo
+            const currentCh = channels.find(c => c.id === state.activeChannel) || channels[0];
+            if (currentCh) {
+                document.getElementById('active-channel-code').textContent = currentCh.code;
+                document.getElementById('active-channel-title').textContent = currentCh.name;
+                document.getElementById('active-channel-subtitle').textContent = `— ${currentCh.subtitle}`;
+            }
+        }
+
+        function selectChannel(channelId) {
+            state.activeChannel = channelId;
+            state.lastReadTimestamps[channelId] = Date.now();
+            renderChannelsSidebar();
+            renderMessagesTable();
+            scrollToBottom();
+            updateTabTitleNotification();
+            document.getElementById('message-input').focus();
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById('messages-container');
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+        window.scrollToBottom = scrollToBottom;
+
+        function renderMessagesTable() {
+            const tbody = document.getElementById('messages-tbody');
+            const emptyState = document.getElementById('empty-channel-state');
+            const counterEl = document.getElementById('message-counter');
+            if (!tbody) return;
+
+            const channelMsgs = state.messages.filter(m => m.channel === state.activeChannel);
+            counterEl.textContent = `${channelMsgs.length} ${channelMsgs.length === 1 ? 'registro' : 'registros'}`;
+
+            if (channelMsgs.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            tbody.innerHTML = '';
+            channelMsgs.forEach((msg, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = `log-row transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-corp-50/60'} hover:bg-sky-50/90`;
+
+                const dateObj = new Date(msg.createdAt || Date.now());
+                const timeStr = dateObj.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const shortId = String(msg.id).slice(-4).toUpperCase();
+
+                const opInfo = getOperatorInfo(msg.sender);
+                const fakeCode = generateFakeTelemetry(msg.id, msg.createdAt);
+                const formattedRealText = formatMessageContent(msg.text, msg.attachmentUrl);
+
+                // Checks de lectura / confirmación ("Conciliado / Visto")
+                const acks = Array.isArray(msg.acknowledgedBy) ? msg.acknowledgedBy : [];
+                const isAckedByMe = acks.includes(state.activeProfile);
+                const ackBadges = acks.map(p => {
+                    const ackOp = getOperatorInfo(p);
+                    return `<span class="px-1 py-0.2 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded text-[9px] font-mono" title="Conciliado por ${escapeHtml(ackOp.fullAlias)}">✓${ackOp.shortCode}</span>`;
+                }).join(' ');
+
+                tr.innerHTML = `
+                    <td class="py-2 px-3 font-mono text-[11px] text-corp-500 align-top whitespace-nowrap">
+                        <div>${timeStr}</div>
+                        <div class="text-[9px] text-corp-400">#${shortId}</div>
+                    </td>
+                    <td class="py-2 px-3 align-top">
+                        <!-- En Modo Sigilo muestra solo el código técnico (ej. AUD-MP01); en hover o ALT muestra AUD-MP01 | Marcos -->
+                        <span class="real-message-content px-2 py-0.5 rounded border font-mono text-[10px] font-semibold ${opInfo.badgeClass}">
+                            ${escapeHtml(opInfo.fullAlias)}
+                        </span>
+                        <span class="fake-telemetry-content hidden px-2 py-0.5 rounded border font-mono text-[10px] font-semibold bg-corp-100 text-corp-700 border-corp-300">
+                            ${escapeHtml(opInfo.nodeCode)}
+                        </span>
+                    </td>
+                    <td class="py-2 px-3 align-top break-words leading-relaxed">
+                        <!-- Texto Real (Oculto cuando Sigilo está activo salvo hover o tecla ALT) -->
+                        <span class="real-message-content text-corp-900 font-medium">${formattedRealText}</span>
+                        <!-- Telemetría Falsa (Visible cuando Sigilo está activo y el mouse no está encima) -->
+                        <span class="fake-telemetry-content hidden font-mono text-[11px] text-corp-500">${fakeCode}</span>
+                    </td>
+                    <td class="py-2 px-3 align-top text-center">
+                        <div class="flex items-center justify-center space-x-1.5">
+                            <input
+                                type="checkbox"
+                                ${isAckedByMe ? 'checked' : ''}
+                                onchange="window.toggleAckMessage('${msg.id}')"
+                                title="Marcar registro como Conciliado (Visto)"
+                                class="rounded border-corp-300 text-emerald-600 focus:ring-0 cursor-pointer w-3.5 h-3.5"
+                            >
+                            <div class="flex flex-wrap gap-0.5 justify-center">${ackBadges}</div>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Formatea el mensaje y convierte links en botones discretos de expediente
+        function formatMessageContent(text, attachmentUrl) {
+            let safe = escapeHtml(text || '');
+
+            // Resaltar etiquetas operativas [VLR], [SENDA], etc.
+            safe = safe.replace(/\[(VLR|SENDA|SEMÁFORO|REVISAR SHEET|OJO \/ URGENTE|URGENTE)\]/g,
+                '<span class="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-corp-200 text-corp-900 mr-1">[$1]</span>'
+            );
+
+            // Detectar URLs pegadas directamente en el texto y disfrazarlas
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            safe = safe.replace(urlRegex, (url) => {
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1 font-mono text-[11px] text-sky-700 hover:text-sky-900 underline bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200 ml-1"><i class="fa-solid fa-up-right-from-square text-[9px]"></i><span>[Abrir Evidencia / Link]</span></a>`;
+            });
+
+            if (attachmentUrl && attachmentUrl.trim() !== '') {
+                const cleanUrl = escapeHtml(attachmentUrl.trim());
+                safe += ` <a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1 font-mono text-[11px] text-sky-800 hover:text-sky-950 bg-sky-100/80 px-2 py-0.5 rounded border border-sky-300 ml-1.5"><i class="fa-solid fa-paperclip text-[9px]"></i><span>Expediente Adjunto</span></a>`;
+            }
+
+            return safe;
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function updateTabTitleNotification() {
+            if (!state.activeProfile) {
+                document.title = 'SGC-Vial | Consola de Conciliación Operativa v2.4.1';
+                updateFaviconBadge(0);
+                return;
+            }
+            const channels = getAvailableChannels();
+            let totalUnread = 0;
+            channels.forEach(ch => {
+                const lastRead = state.lastReadTimestamps[ch.id] || 0;
+                totalUnread += state.messages.filter(m =>
+                    m.channel === ch.id &&
+                    m.sender !== state.activeProfile &&
+                    (m.createdAt || 0) > lastRead
+                ).length;
+            });
+
+            // Muestra "(1) SGC-Vial..." exactamente como Gmail en la pestaña del navegador
+            if (totalUnread > 0) {
+                document.title = `(${totalUnread}) SGC-Vial | Consola de Conciliación`;
+            } else {
+                document.title = 'SGC-Vial | Consola de Conciliación Operativa v2.4.1';
+            }
+            updateFaviconBadge(totalUnread);
+        }
+
+        // Genera un ícono de pestaña dinámico con punto de notificación cuando hay mensajes nuevos
+        function updateFaviconBadge(unreadCount) {
+            const link = document.getElementById('dynamic-favicon');
+            if (!link) return;
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+
+            // Base corporativa azul oscuro
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.roundRect(2, 2, 28, 28, 6);
+            ctx.fill();
+
+            // Texto SGC
+            ctx.fillStyle = '#38bdf8';
+            ctx.font = 'bold 11px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('SGC', 16, 17);
+
+            // Si hay mensajes sin leer, dibuja círculo con número estilo notificación de navegador
+            if (unreadCount > 0) {
+                ctx.fillStyle = '#f59e0b';
+                ctx.beginPath();
+                ctx.arc(24, 8, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#0f172a';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.fillText(unreadCount > 9 ? '+' : String(unreadCount), 24, 8.5);
+            }
+
+            link.href = canvas.toDataURL('image/png');
+        }
+
+        // --- ACCIONES DEL USUARIO (LOGIN POR PIN INDIVIDUAL, ENVÍO, CHECKS, PURGA) ---
+        window.handleLogin = function(e) {
+            e.preventDefault();
+            const pinInput = document.getElementById('login-pin').value.trim();
+            const startStealth = document.getElementById('login-start-stealth').checked;
+            const autoPanic = document.getElementById('login-auto-panic').checked;
+            const errEl = document.getElementById('login-error');
+
+            // Identificar automáticamente al usuario según el PIN ingresado
+            const matchedOp = Object.values(OPERATORS).find(op => op.pin === pinInput);
+
+            if (!matchedOp) {
+                errEl.classList.remove('hidden');
+                return;
+            }
+            errEl.classList.add('hidden');
+
+            state.activeProfile = matchedOp.id;
+            state.activeChannel = 'general';
+
+            // Inicializar marcas de lectura para canales disponibles
+            const now = Date.now();
+            Object.keys(state.lastReadTimestamps).forEach(k => state.lastReadTimestamps[k] = now);
+
+            // Configurar capas de seguridad elegidas
+            setStealthMode(startStealth);
+            setAutoBlurPanic(autoPanic);
+
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('login-pin').value = '';
+
+            updateHeaderActiveUser();
+            startPresenceHeartbeat();
+            renderChannelsSidebar();
+            renderMessagesTable();
+            scrollToBottom();
+            updateTabTitleNotification();
+        };
+
+        window.logoutSession = function() {
+            const previousProfile = state.activeProfile;
+            stopPresenceHeartbeat();
+            state.activeProfile = null;
+
+            // Bloquear la interfaz de forma inmediata sin esperar a la red
+            const loginError = document.getElementById('login-error');
+            const loginPin = document.getElementById('login-pin');
+            const loginScreen = document.getElementById('login-screen');
+
+            if (loginError) loginError.classList.add('hidden');
+            if (loginPin) loginPin.value = '';
+            if (loginScreen) loginScreen.classList.remove('hidden');
+
+            updateTabTitleNotification();
+            if (loginPin) loginPin.focus();
+
+            // Notificar desconexión en segundo plano sin bloquear la pantalla
+            if (previousProfile) {
+                publishPresence('offline', previousProfile);
+            }
+        };
+
+        window.handleSendMessage = async function(e) {
+            e.preventDefault();
+            if (!state.activeProfile) return;
+
+            const inputEl = document.getElementById('message-input');
+            const attachEl = document.getElementById('attachment-url-input');
+            const text = inputEl.value.trim();
+            const attachmentUrl = attachEl.value.trim();
+
+            if (!text && !attachmentUrl) return;
+
+            const newMsg = {
+                channel: state.activeChannel,
+                sender: state.activeProfile,
+                text: text || 'Evidencia adjunta para verificación.',
+                attachmentUrl: attachmentUrl || '',
+                acknowledgedBy: [state.activeProfile],
+                createdAt: Date.now()
+            };
+
+            inputEl.value = '';
+            clearAttachmentInput();
+
+            if (state.firebaseUser && db) {
+                try {
+                    const msgsColRef = collection(db, 'artifacts', appId, 'public', 'data', 'sgc_messages');
+                    await addDoc(msgsColRef, newMsg);
+                    scrollToBottom();
+                } catch (err) {
+                    console.error("Error guardando mensaje:", err);
+                }
+            } else {
+                // Fallback en memoria si no hay conexión
+                state.messages.push({ id: 'loc_' + Date.now(), ...newMsg });
+                renderMessagesTable();
+                scrollToBottom();
+            }
+        };
+
+        window.toggleAckMessage = async function(msgId) {
+            if (!state.activeProfile) return;
+            const target = state.messages.find(m => m.id === msgId);
+            if (!target) return;
+
+            const currentAcks = Array.isArray(target.acknowledgedBy) ? [...target.acknowledgedBy] : [];
+            const idx = currentAcks.indexOf(state.activeProfile);
+            if (idx >= 0) {
+                currentAcks.splice(idx, 1);
+            } else {
+                currentAcks.push(state.activeProfile);
+            }
+
+            if (state.firebaseUser && db && !String(msgId).startsWith('loc_')) {
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'sgc_messages', msgId);
+                    await updateDoc(docRef, { acknowledgedBy: currentAcks });
+                } catch (err) {
+                    console.error("Error actualizando visto:", err);
+                }
+            } else {
+                target.acknowledgedBy = currentAcks;
+                renderMessagesTable();
+            }
+        };
+
+        // --- FUNCIONES DE ETIQUETAS Y ADJUNTOS ---
+        window.insertQuickTag = function(tag) {
+            const input = document.getElementById('message-input');
+            input.value = tag + input.value;
+            input.focus();
+        };
+
+        window.toggleAttachmentInput = function() {
+            const bar = document.getElementById('attachment-bar');
+            bar.classList.toggle('hidden');
+            if (!bar.classList.contains('hidden')) {
+                document.getElementById('attachment-url-input').focus();
+            }
+        };
+
+        window.clearAttachmentInput = function() {
+            document.getElementById('attachment-url-input').value = '';
+            document.getElementById('attachment-bar').classList.add('hidden');
+        };
+
+        // --- CONTROLES ANTI-MONITOREO (SIGILO, BAJO CONTRASTE, PÁNICO) ---
+        function setStealthMode(enabled) {
+            state.stealthMode = enabled;
+            const container = document.getElementById('messages-container');
+            const btn = document.getElementById('btn-stealth-toggle');
+            const statusText = document.getElementById('stealth-status-text');
+
+            if (enabled) {
+                container.classList.add('stealth-active');
+                statusText.textContent = 'ACTIVO';
+                btn.className = 'px-2.5 py-1 rounded border text-[11px] font-mono flex items-center space-x-1.5 transition bg-emerald-950/80 border-emerald-700 text-emerald-300';
+            } else {
+                container.classList.remove('stealth-active');
+                statusText.textContent = 'OFF';
+                btn.className = 'px-2.5 py-1 rounded border text-[11px] font-mono flex items-center space-x-1.5 transition bg-corp-800 border-corp-700 text-corp-300';
+            }
+            if (state.activeProfile) {
+                updateHeaderActiveUser();
+                renderChannelsSidebar();
+            }
+        }
+
+        window.toggleStealthMode = function() {
+            setStealthMode(!state.stealthMode);
+        };
+
+        window.toggleLowContrast = function() {
+            state.lowContrastMode = !state.lowContrastMode;
+            const container = document.getElementById('messages-container');
+            const btn = document.getElementById('btn-contrast-toggle');
+            if (state.lowContrastMode) {
+                container.classList.add('low-contrast-mode');
+                btn.classList.add('border-sky-500', 'text-sky-300');
+            } else {
+                container.classList.remove('low-contrast-mode');
+                btn.classList.remove('border-sky-500', 'text-sky-300');
+            }
+        };
+
+        function setAutoBlurPanic(enabled) {
+            state.autoBlurPanic = enabled;
+            const statusText = document.getElementById('autoblur-status-text');
+            const btn = document.getElementById('btn-autoblur-toggle');
+            if (enabled) {
+                statusText.textContent = 'ON';
+                btn.className = 'px-2.5 py-1 rounded border border-amber-600 bg-amber-950/60 text-amber-300 text-[11px] font-mono flex items-center space-x-1 transition';
+            } else {
+                statusText.textContent = 'OFF';
+                btn.className = 'px-2.5 py-1 rounded border border-corp-700 bg-corp-800 hover:bg-corp-700 text-corp-300 text-[11px] font-mono flex items-center space-x-1 transition';
+            }
+        }
+
+        window.toggleAutoBlurPanic = function() {
+            setAutoBlurPanic(!state.autoBlurPanic);
+        };
+
+        window.activatePanicMode = function() {
+            state.panicActive = true;
+            renderDummyMetrics();
+            document.getElementById('panic-screen').classList.remove('hidden');
+            document.title = 'SGC-Vial | Reporte de Métricas y Productividad';
+        };
+
+        window.deactivatePanicMode = function() {
+            state.panicActive = false;
+            document.getElementById('panic-screen').classList.add('hidden');
+            if (state.activeProfile) {
+                state.lastReadTimestamps[state.activeChannel] = Date.now();
+                publishPresence('online');
+                renderChannelsSidebar();
+            }
+            updateTabTitleNotification();
+        };
+
+        // --- PURGA DE LOTE DIARIO (FIN DE TURNO) ---
+        window.openPurgeModal = function() {
+            document.getElementById('purge-modal').classList.remove('hidden');
+        };
+
+        window.closePurgeModal = function() {
+            document.getElementById('purge-modal').classList.add('hidden');
+        };
+
+        window.executePurgeAllMessages = async function() {
+            const btn = document.getElementById('btn-confirm-purge');
+            btn.textContent = 'Purgando...';
+            btn.disabled = true;
+
+            if (state.firebaseUser && db) {
+                try {
+                    const deletions = state.messages.map(m =>
+                        deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sgc_messages', m.id))
+                    );
+                    await Promise.all(deletions);
+                } catch (err) {
+                    console.error("Error purgando registros:", err);
+                }
+            }
+            state.messages = [];
+            renderMessagesTable();
+            btn.textContent = 'Sí, Purgar Lote';
+            btn.disabled = false;
+            closePurgeModal();
+        };
+
+        // --- DATOS SIMULADOS PARA LA PANTALLA DE PÁNICO ---
+        const dummyOperators = [
+            { name: 'GONZALEZ.VALENTIN', vector: 'VLR', count: 214, obs: 6, reason: 'MARCA/MODELO', status: 'AUDITADO' },
+            { name: 'JULIA.ZATTARA', vector: 'SENDA', count: 198, obs: 5, reason: 'HORARIO INCORRECTO', status: 'AUDITADO' },
+            { name: 'TOMAS MARTINEZ', vector: 'VLR', count: 185, obs: 3, reason: 'MAL CATALOGADO', status: 'CONCILIADO' },
+            { name: 'ALFREDO ROMAN', vector: 'SEMAFORO', count: 176, obs: 2, reason: 'HORARIO INCORRECTO', status: 'CONCILIADO' },
+            { name: 'TEODORO FARIAS', vector: 'SENDA', count: 162, obs: 2, reason: 'ZARATE SENDA', status: 'AUDITADO' },
+            { name: 'PANTEON.MATIAS', vector: 'SEMAFORO', count: 159, obs: 1, reason: 'GIRO APAGADO', status: 'CONCILIADO' },
+            { name: 'NOELIA ERROBIDART', vector: 'VLR', count: 168, obs: 2, reason: 'SIN INFRACCIÓN', status: 'AUDITADO' },
+            { name: 'AGUSTIN.VISCARRA', vector: 'SEMAFORO', count: 163, obs: 1, reason: 'SEMÁFORO APAGADO', status: 'OK' }
+        ];
+
+        window.renderDummyMetrics = function() {
+            const filter = document.getElementById('dummy-filter-type')?.value || 'ALL';
+            const tbody = document.getElementById('dummy-operator-rows');
+            if (!tbody) return;
+
+            const filtered = filter === 'ALL'
+                ? dummyOperators
+                : dummyOperators.filter(o => o.vector === filter);
+
+            tbody.innerHTML = filtered.map(op => `
+                <tr class="hover:bg-corp-50">
+                    <td class="py-2 px-3 font-semibold text-corp-800">${op.name}</td>
+                    <td class="py-2 px-3"><span class="px-1.5 py-0.5 rounded bg-corp-100 border border-corp-300 text-[10px]">${op.vector}</span></td>
+                    <td class="py-2 px-3">${op.count}</td>
+                    <td class="py-2 px-3 font-bold ${op.obs > 3 ? 'text-amber-600' : 'text-corp-700'}">${op.obs}</td>
+                    <td class="py-2 px-3 text-corp-600">${op.reason}</td>
+                    <td class="py-2 px-3"><span class="text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded text-[10px]">${op.status}</span></td>
+                </tr>
+            `).join('');
+
+            const now = new Date();
+            const clockEl = document.getElementById('panic-clock');
+            if (clockEl) {
+                clockEl.textContent = now.toLocaleDateString('es-AR') + ' ' + now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+            }
+        };
+
+        window.exportDummyCSV = function() {
+            const rows = [
+                ['OPERADOR', 'VECTOR', 'PROCESADAS', 'OBSERVACIONES', 'MOTIVO_PRINCIPAL', 'ESTADO'],
+                ...dummyOperators.map(o => [o.name, o.vector, o.count, o.obs, o.reason, o.status])
+            ];
+            const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "reporte_conciliacion_sgc.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        // --- ATAJOS DE TECLADO Y EVENTOS DE PROTECCIÓN DE PANTALLA ---
+        let isHoldingRevealKey = false;
+
+        window.addEventListener('keydown', (e) => {
+            // ESC activa el Modo Pánico de inmediato
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                isHoldingRevealKey = false;
+                document.body.classList.remove('alt-reveal-active');
+                activatePanicMode();
+                return;
+            }
+            // Alt + Q permite salir del Modo Pánico discretamente
+            if (e.altKey && (e.key === 'q' || e.key === 'Q')) {
+                e.preventDefault();
+                if (state.panicActive) deactivatePanicMode();
+                return;
+            }
+            // Mantener ALT revela todos los mensajes sin que el navegador robe el foco ni dispare el pánico
+            if (e.key === 'Alt') {
+                e.preventDefault();
+                isHoldingRevealKey = true;
+                document.body.classList.add('alt-reveal-active');
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'Alt') {
+                e.preventDefault();
+                isHoldingRevealKey = false;
+                document.body.classList.remove('alt-reveal-active');
+            }
+        });
+
+        // Al perder foco de ventana, ignorar el falso blur que genera Windows al presionar ALT
+        window.addEventListener('blur', () => {
+            if (isHoldingRevealKey && !document.hidden) {
+                return;
+            }
+            state.windowFocused = false;
+            isHoldingRevealKey = false;
+            document.body.classList.remove('alt-reveal-active');
+            if (state.activeProfile) {
+                publishPresence('away');
+            }
+            if (state.autoBlurPanic && state.activeProfile && !state.panicActive) {
+                activatePanicMode();
+            }
+        });
+
+        window.addEventListener('focus', () => {
+            state.windowFocused = true;
+            if (state.activeProfile && !state.panicActive) {
+                state.lastReadTimestamps[state.activeChannel] = Date.now();
+                publishPresence('online');
+                renderChannelsSidebar();
+                updateTabTitleNotification();
+            }
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            state.windowFocused = !document.hidden;
+            if (!document.hidden && state.activeProfile && !state.panicActive) {
+                state.lastReadTimestamps[state.activeChannel] = Date.now();
+                publishPresence('online');
+                renderChannelsSidebar();
+                updateTabTitleNotification();
+            } else if (document.hidden && state.activeProfile) {
+                publishPresence('away');
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (state.activeProfile) {
+                publishPresence('offline');
+            }
+        });
+
+        // Iniciar aplicación al cargar
+        window.onload = function() {
+            renderDummyMetrics();
+            updateFaviconBadge(0);
+            initFirebase();
+        };
+    </script>
+</body>
+</html>
